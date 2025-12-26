@@ -1,0 +1,46 @@
+title: "[Help]: "
+labels: ["help"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with docker-server-blockchain? We're here to assist!
+
+        Before asking, please check:
+        - [Documentation](../docs/)
+        - [Existing discussions](https://github.com/host-uk/docker-server-blockchain/discussions)
+        - [Troubleshooting guide](../docs/TROUBLESHOOTING.md)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Describe what you're trying to do or understand
+      placeholder: I'm trying to...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Installation/Setup
+        - Configuration
+        - Coolify Deployment
+        - Lightning Network
+        - Bitcoin Node
+        - BTCPay Server
+        - Backup/Restore
+        - Performance
+        - Other
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Share relevant details about your setup
+      placeholder: |
+        - Deployment: Compose/Coolify/AIO
+        - Network: mainnet/testnet/regtest
+        - OS: ...

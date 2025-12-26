@@ -1,0 +1,78 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title follows conventional commits
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" should start with a lowercase letter.
+          ignoreLabels: |
+            bot
+            dependencies
+          headerPattern: '^(\w*)(?:\(([\w$.\-*/ ]*)\))?: (.*)$'
+          headerPatternCorrespondence: type, scope, subject
+
+  commits:
+    name: Validate Commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages
+        uses: wagoid/commitlint-github-action@v5
+        with:
+          configFile: .github/commitlint.config.js
+        continue-on-error: true
+
+  branch:
+    name: Check Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming
+        uses: deepakputhraya/action-branch-name@master
+        with:
+          regex: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\/[a-z0-9._-]+$|^(main|master|develop|release\/.+|hotfix\/.+)$'
+          allowed_prefixes: 'feat,fix,docs,style,refactor,perf,test,build,ci,chore,revert,main,master,develop,release,hotfix,dependabot'
+          ignore: main,master,develop
+          min_length: 3
+          max_length: 100
+        continue-on-error: true
+
+  conflicts:
+    name: Check for Conflicts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for merge conflicts
+        uses: eps1lon/actions-label-merge-conflict@v3.0.2
+        with:
+          dirtyLabel: "conflicts"
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          commentOnDirty: "This PR has merge conflicts. Please resolve them before merging."
+          commentOnClean: "Conflicts resolved! Thanks for updating the PR."

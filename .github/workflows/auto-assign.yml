@@ -1,0 +1,63 @@
+name: Auto Assign
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  assign-pr:
+    name: Assign PR Author
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    steps:
+      - name: Assign PR to author
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const author = context.payload.pull_request.user.login;
+
+            // Don't assign if it's a bot
+            if (author.includes('[bot]')) return;
+
+            await github.rest.issues.addAssignees({
+              owner,
+              repo,
+              issue_number: prNumber,
+              assignees: [author]
+            });
+
+  welcome:
+    name: Welcome New Contributors
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    steps:
+      - name: Welcome first-time contributor
+        uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-message: |
+            Thanks for your first contribution to docker-server-blockchain! 🎉
+
+            A maintainer will review your PR soon. In the meantime, please make sure:
+            - [ ] Your changes follow the project's coding standards
+            - [ ] You've tested your changes locally
+            - [ ] Documentation has been updated if needed
+
+            If you have any questions, feel free to ask!
+          issue-message: |
+            Thanks for opening your first issue! 🎉
+
+            We'll review it as soon as possible. To help us address your issue quickly:
+            - Please make sure you've filled out all the required fields in the issue template
+            - Include any relevant logs or configuration (with sensitive data removed)
+            - If it's a bug, try to provide steps to reproduce
+
+            Thank you for contributing to the project!

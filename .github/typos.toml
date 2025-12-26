@@ -1,0 +1,29 @@
+# typos configuration
+# https://github.com/crate-ci/typos
+
+[default]
+extend-ignore-identifiers-re = [
+    # Bitcoin/crypto terms
+    "BTCPAY.*",
+    "NBXplorer",
+    "bitcoind",
+    "btcpayserver",
+    "rpc.*",
+]
+
+[default.extend-words]
+# Technical terms that are not typos
+regtest = "regtest"
+signet = "signet"
+mainnet = "mainnet"
+testnet = "testnet"
+fqdn = "fqdn"
+datadir = "datadir"
+
+[files]
+extend-exclude = [
+    "*.lock",
+    ".git/",
+    "*.min.js",
+    "*.min.css",
+]

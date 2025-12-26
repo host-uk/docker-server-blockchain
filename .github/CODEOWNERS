@@ -1,0 +1,28 @@
+# Code Owners for docker-server-blockchain
+# These owners will be requested for review when someone opens a PR
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @host-uk/maintainers
+
+# Docker configuration
+Dockerfile @host-uk/maintainers
+docker-compose*.yaml @host-uk/maintainers
+docker-compose*.yml @host-uk/maintainers
+
+# GitHub Actions and CI/CD
+.github/ @host-uk/maintainers
+
+# Security-sensitive files
+SECURITY.md @host-uk/maintainers
+.env.example @host-uk/maintainers
+
+# Scripts
+scripts/ @host-uk/maintainers
+
+# Configuration
+config/ @host-uk/maintainers
+
+# Documentation
+docs/ @host-uk/maintainers
+*.md @host-uk/maintainers

@@ -1,0 +1,75 @@
+# PR Labeler configuration
+# https://github.com/actions/labeler
+
+# Docker-related changes
+component/docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Dockerfile'
+          - 'docker-compose*.yaml'
+          - 'docker-compose*.yml'
+
+# AIO image changes
+component/aio:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Dockerfile'
+          - 'config/**'
+          - 'scripts/aio-entrypoint.sh'
+
+# Bitcoin-related changes
+component/bitcoin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/bitcoin*'
+          - 'config/supervisor/services/bitcoind.conf'
+
+# Lightning-related changes
+component/lightning:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docker-compose.lightning.yml'
+          - 'docker-compose.lnd.yml'
+          - '**/lightning*'
+          - '**/lnd*'
+          - '**/cln*'
+
+# CI/CD changes
+component/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+# Documentation changes
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+
+# Configuration changes
+component/compose:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docker-compose*.yaml'
+          - 'docker-compose*.yml'
+          - '.env.example'
+
+# Coolify-related changes
+component/coolify:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docker-compose.coolify.yaml'
+          - 'docs/COOLIFY.md'
+
+# Script changes
+scripts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'scripts/**'
+
+# Test changes
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'

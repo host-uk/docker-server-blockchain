@@ -1,0 +1,65 @@
+name: Question
+description: Ask a question about configuration or usage
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're here to help! Please fill out the form below.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: How do I...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      description: What area is your question about?
+      options:
+        - Installation/Setup
+        - Configuration
+        - Coolify Deployment
+        - Lightning Network
+        - Bitcoin Node
+        - BTCPay Server
+        - Backup/Restore
+        - Performance/Optimization
+        - Security
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Any relevant context about your setup or what you're trying to achieve
+      placeholder: |
+        I'm trying to...
+        My setup is...
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I've Tried
+      description: What have you already tried or researched?
+      placeholder: |
+        - I've read the documentation at...
+        - I've tried configuring...
+
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Documentation Check
+      options:
+        - label: I have checked the [documentation](docs/) for an answer
+          required: true
+        - label: I have searched existing issues for similar questions
+          required: true

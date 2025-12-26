@@ -1,0 +1,138 @@
+# Labels configuration for the repository
+# Sync with: gh label sync --labels .github/labels.yml
+
+# Type labels
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to documentation
+
+- name: question
+  color: d876e3
+  description: Further information is requested
+
+# Priority labels
+- name: priority/critical
+  color: b60205
+  description: Critical priority - needs immediate attention
+
+- name: priority/high
+  color: d93f0b
+  description: High priority
+
+- name: priority/medium
+  color: fbca04
+  description: Medium priority
+
+- name: priority/low
+  color: 0e8a16
+  description: Low priority
+
+# Status labels
+- name: triage
+  color: ededed
+  description: Needs triage
+
+- name: stale
+  color: ededed
+  description: No activity for an extended period
+
+- name: blocked
+  color: b60205
+  description: Blocked by other work
+
+- name: work-in-progress
+  color: fbca04
+  description: Work in progress
+
+- name: do-not-close
+  color: 0052cc
+  description: Do not close this issue/PR
+
+- name: pinned
+  color: 006b75
+  description: Pinned issue/PR
+
+# Component labels
+- name: component/docker
+  color: 0db7ed
+  description: Docker configuration
+
+- name: component/compose
+  color: 0db7ed
+  description: Docker Compose files
+
+- name: component/aio
+  color: 0db7ed
+  description: All-in-One image
+
+- name: component/bitcoin
+  color: f7931a
+  description: Bitcoin Core related
+
+- name: component/lightning
+  color: 792de4
+  description: Lightning Network (CLN/LND)
+
+- name: component/btcpay
+  color: 51b13e
+  description: BTCPay Server related
+
+- name: component/coolify
+  color: 6d28d9
+  description: Coolify deployment
+
+- name: component/ci
+  color: 5319e7
+  description: CI/CD and GitHub Actions
+
+# Contribution labels
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+
+- name: help wanted
+  color: 008672
+  description: Extra attention is needed
+
+- name: hacktoberfest
+  color: ff7518
+  description: Hacktoberfest participation
+
+# Dependency labels
+- name: dependencies
+  color: 0366d6
+  description: Pull requests that update dependencies
+
+- name: github-actions
+  color: 000000
+  description: GitHub Actions related
+
+- name: docker
+  color: 0db7ed
+  description: Docker related
+
+# Security
+- name: security
+  color: b60205
+  description: Security related issue
+
+# Duplicate/Invalid
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+
+- name: invalid
+  color: e4e669
+  description: This doesn't seem right
+
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on

@@ -1,0 +1,29 @@
+title: "[Idea]: "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your ideas for improving docker-server-blockchain!
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: Describe your idea
+      placeholder: I think it would be great if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Benefits
+      description: What benefits would this bring?
+      placeholder: This would help because...
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Possible Implementation
+      description: Do you have any thoughts on how this could be implemented?

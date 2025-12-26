@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: BTCPay Server Documentation
+    url: https://docs.btcpayserver.org/
+    about: Official BTCPay Server documentation
+  - name: BTCPay Server Community
+    url: https://chat.btcpayserver.org/
+    about: Join the BTCPay Server Mattermost community
+  - name: Bitcoin Core Documentation
+    url: https://developer.bitcoin.org/
+    about: Bitcoin Core developer documentation

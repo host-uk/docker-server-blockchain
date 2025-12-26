@@ -3,6 +3,14 @@
 Production-ready Docker deployment for BTCPay Server, optimized for Coolify and self-hosted environments.
 
 [![License](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](LICENCE)
+[![Build AIO](https://github.com/host-uk/docker-server-blockchain/actions/workflows/build-aio.yml/badge.svg)](https://github.com/host-uk/docker-server-blockchain/actions/workflows/build-aio.yml)
+[![Validate](https://github.com/host-uk/docker-server-blockchain/actions/workflows/validate.yml/badge.svg)](https://github.com/host-uk/docker-server-blockchain/actions/workflows/validate.yml)
+[![Security Scan](https://github.com/host-uk/docker-server-blockchain/actions/workflows/security-scan.yml/badge.svg)](https://github.com/host-uk/docker-server-blockchain/actions/workflows/security-scan.yml)
+[![GitHub release](https://img.shields.io/github/v/release/host-uk/docker-server-blockchain?include_prereleases)](https://github.com/host-uk/docker-server-blockchain/releases)
+[![GitHub issues](https://img.shields.io/github/issues/host-uk/docker-server-blockchain)](https://github.com/host-uk/docker-server-blockchain/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/host-uk/docker-server-blockchain)](https://github.com/host-uk/docker-server-blockchain/pulls)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/host-uk)](https://github.com/sponsors/host-uk)
+[![Docker Image Size](https://img.shields.io/docker/image-size/host-uk/docker-server-blockchain-aio/latest)](https://github.com/host-uk/docker-server-blockchain/pkgs/container/docker-server-blockchain-aio)
 
 ## Features
 
