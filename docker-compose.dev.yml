@@ -1,0 +1,57 @@
+# ============================================================
+# Docker Server Blockchain - Development Configuration
+# ============================================================
+# Development override for local testing with regtest network
+#
+# Usage:
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml up -d
+#   make dev (recommended)
+# ============================================================
+
+services:
+  btcpayserver:
+    environment:
+      BTCPAY_NETWORK: regtest
+      BTCPAY_HOST: localhost
+      BTCPAY_PROTOCOL: http
+      ASPNETCORE_ENVIRONMENT: Development
+      BTCPAY_DEBUGLOG: /datadir/debug.log
+    ports:
+      - "49392:49392"
+
+  nbxplorer:
+    environment:
+      NBXPLORER_NETWORK: regtest
+    ports:
+      - "32838:32838"
+
+  bitcoind:
+    environment:
+      BITCOIN_NETWORK: regtest
+      CREATE_WALLET: "true"
+      BITCOIN_EXTRA_ARGS: |
+        server=1
+        rpcport=43782
+        rpcbind=0.0.0.0:43782
+        rpcallowip=0.0.0.0/0
+        rpcuser=${BITCOIN_RPC_USER:-rpc}
+        rpcpassword=${BITCOIN_RPC_PASSWORD:-rpcpassword}
+        port=39388
+        whitelist=0.0.0.0/0
+        fallbackfee=0.0001
+        txindex=1
+        zmqpubrawblock=tcp://0.0.0.0:28332
+        zmqpubrawtx=tcp://0.0.0.0:28333
+        zmqpubhashblock=tcp://0.0.0.0:28334
+    ports:
+      - "43782:43782"  # RPC
+      - "39388:39388"  # P2P
+      - "28332:28332"  # ZMQ Block
+      - "28333:28333"  # ZMQ TX
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"

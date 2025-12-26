@@ -1,0 +1,208 @@
+# ============================================================
+# Docker Server Blockchain - BTCPay Server Stack
+# ============================================================
+# Production-ready BTCPay Server deployment for Coolify
+#
+# Required Variables (must be set):
+#   - BTCPAY_HOST: Domain for BTCPay Server
+#   - POSTGRES_PASSWORD: PostgreSQL password
+#
+# See .env.example for all configuration options
+# ============================================================
+
+services:
+  # ============================================================
+  # BTCPay Server - Main Application
+  # ============================================================
+  btcpayserver:
+    image: btcpayserver/btcpayserver:${BTCPAY_VERSION:-2.0.6}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nbxplorer:
+        condition: service_started
+    expose:
+      - "49392"
+    environment:
+      # Required - Critical configuration
+      BTCPAY_HOST: ${BTCPAY_HOST:?BTCPay host domain is required}
+      BTCPAY_POSTGRES: Host=postgres;Port=5432;Database=btcpay${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${POSTGRES_PASSWORD:?PostgreSQL password is required}
+
+      # Required with sensible defaults
+      BTCPAY_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      BTCPAY_BIND: ${BTCPAY_BIND:-0.0.0.0:49392}
+      BTCPAY_ROOTPATH: ${BTCPAY_ROOTPATH:-/}
+      BTCPAY_PROTOCOL: ${BTCPAY_PROTOCOL:-https}
+
+      # NBXplorer Connection
+      BTCPAY_BTCEXPLORERURL: http://nbxplorer:32838/
+      BTCPAY_BTCEXTERNALSSHCONNECTION: ${BTCPAY_SSH_CONNECTION:-}
+
+      # Optional - Features
+      BTCPAY_SSHKEYFILE: ${BTCPAY_SSHKEYFILE:-}
+      BTCPAY_SSHTRUSTEDFINGERPRINTS: ${BTCPAY_SSHTRUSTEDFINGERPRINTS:-}
+      BTCPAY_UPDATEURL: ${BTCPAY_UPDATEURL:-}
+      BTCPAY_DOCKERDEPLOYMENT: ${BTCPAY_DOCKERDEPLOYMENT:-true}
+
+      # Lightning Network (Optional)
+      BTCPAY_BTCLIGHTNING: ${BTCPAY_BTCLIGHTNING:-}
+
+      # Debugging
+      BTCPAY_DEBUGLOG: ${BTCPAY_DEBUGLOG:-}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+    volumes:
+      - btcpay_datadir:/datadir
+      - nbxplorer_datadir:/root/.nbxplorer
+      - btcpay_plugins:/root/.btcpayserver/Plugins
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:49392/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # NBXplorer - Bitcoin Block Explorer/Indexer
+  # ============================================================
+  nbxplorer:
+    image: nicolasdorier/nbxplorer:${NBXPLORER_VERSION:-2.5.16}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bitcoind:
+        condition: service_started
+    expose:
+      - "32838"
+    environment:
+      # Required with sensible defaults
+      NBXPLORER_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      NBXPLORER_BIND: ${NBXPLORER_BIND:-0.0.0.0:32838}
+      NBXPLORER_TRIMEVENTS: ${NBXPLORER_TRIMEVENTS:-10000}
+      NBXPLORER_SIGNALFILESDIR: /datadir
+
+      # PostgreSQL Connection
+      NBXPLORER_POSTGRES: Host=postgres;Port=5432;Database=nbxplorer${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${POSTGRES_PASSWORD:?PostgreSQL password is required};MaxPoolSize=${NBXPLORER_POSTGRES_MAXPOOL:-20};Application Name=nbxplorer
+
+      # Bitcoin Node Connection
+      NBXPLORER_BTCRPCURL: http://bitcoind:43782/
+      NBXPLORER_BTCNODEENDPOINT: bitcoind:39388
+      NBXPLORER_BTCRPCUSER: ${BITCOIN_RPC_USER:-rpc}
+      NBXPLORER_BTCRPCPASSWORD: ${BITCOIN_RPC_PASSWORD:-rpcpassword}
+
+      # Optional - Advanced
+      NBXPLORER_NOAUTH: ${NBXPLORER_NOAUTH:-1}
+      NBXPLORER_EXPOSERPC: ${NBXPLORER_EXPOSERPC:-1}
+    volumes:
+      - nbxplorer_datadir:/datadir
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32838/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Bitcoin Core - Full Node
+  # ============================================================
+  bitcoind:
+    image: btcpayserver/bitcoin:${BITCOIN_VERSION:-28.0}
+    restart: unless-stopped
+    expose:
+      - "43782"  # RPC
+      - "39388"  # P2P
+    environment:
+      # Required with sensible defaults
+      BITCOIN_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      CREATE_WALLET: ${BITCOIN_CREATE_WALLET:-false}
+      BITCOIN_WALLETDIR: /walletdata
+
+      # Bitcoin Configuration
+      BITCOIN_EXTRA_ARGS: |
+        server=1
+        rpcport=43782
+        rpcbind=0.0.0.0:43782
+        rpcallowip=0.0.0.0/0
+        rpcuser=${BITCOIN_RPC_USER:-rpc}
+        rpcpassword=${BITCOIN_RPC_PASSWORD:-rpcpassword}
+        port=39388
+        whitelist=0.0.0.0/0
+        maxmempool=${BITCOIN_MAXMEMPOOL:-500}
+        dbcache=${BITCOIN_DBCACHE:-512}
+        prune=${BITCOIN_PRUNE:-0}
+        txindex=${BITCOIN_TXINDEX:-1}
+        zmqpubrawblock=tcp://0.0.0.0:28332
+        zmqpubrawtx=tcp://0.0.0.0:28333
+        zmqpubhashblock=tcp://0.0.0.0:28334
+    volumes:
+      - bitcoin_datadir:/data
+      - bitcoin_wallet_datadir:/walletdata
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-rpcuser=${BITCOIN_RPC_USER:-rpc}", "-rpcpassword=${BITCOIN_RPC_PASSWORD:-rpcpassword}", "getblockchaininfo"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # PostgreSQL - Database
+  # ============================================================
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-16-alpine}
+    restart: unless-stopped
+    shm_size: ${POSTGRES_SHM_SIZE:-256mb}
+    environment:
+      # Required
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?PostgreSQL password is required}
+
+      # Required with sensible defaults
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-btcpaymainnet}
+
+      # Optional - Performance tuning
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    command:
+      - "-c"
+      - "random_page_cost=1.0"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"
+      - "-c"
+      - "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}"
+      - "-c"
+      - "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE:-1GB}"
+    volumes:
+      - postgres_datadir:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+
+# ============================================================
+# Volumes - Persistent Data Storage
+# ============================================================
+volumes:
+  btcpay_datadir:
+    name: btcpay_datadir
+  btcpay_plugins:
+    name: btcpay_plugins
+  nbxplorer_datadir:
+    name: nbxplorer_datadir
+  postgres_datadir:
+    name: postgres_datadir
+  bitcoin_datadir:
+    name: bitcoin_datadir
+  bitcoin_wallet_datadir:
+    name: bitcoin_wallet_datadir

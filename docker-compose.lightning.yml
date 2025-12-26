@@ -1,0 +1,101 @@
+# ============================================================
+# Lightning Network Add-on
+# ============================================================
+# Overlay file to add Core Lightning (CLN) to the stack
+#
+# Usage:
+#   docker compose -f docker-compose.yaml -f docker-compose.lightning.yml up -d
+#
+# For Coolify:
+#   docker compose -f docker-compose.coolify.yaml -f docker-compose.lightning.yml up -d
+# ============================================================
+
+services:
+  # ============================================================
+  # Core Lightning (CLN) - Lightning Network Node
+  # ============================================================
+  clightning:
+    image: elementsproject/lightningd:${CLN_VERSION:-v24.11}
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_started
+    expose:
+      - "9735"   # P2P
+      - "9836"   # gRPC
+    ports:
+      - "9735:9735"  # Lightning P2P - must be accessible
+    environment:
+      LIGHTNINGD_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+    command:
+      - --network=${BTCPAY_NETWORK:-mainnet}
+      - --bitcoin-rpcconnect=bitcoind
+      - --bitcoin-rpcport=43782
+      - --bitcoin-rpcuser=${SERVICE_USER_BITCOIN:-btcrpc}
+      - --bitcoin-rpcpassword=${SERVICE_PASSWORD_BITCOIN}
+      - --lightning-dir=/data
+      - --bind-addr=0.0.0.0:9735
+      - --announce-addr=${CLN_ANNOUNCE_ADDR:-}
+      - --alias=${CLN_ALIAS:-BTCPay-CLN}
+      - --rgb=${CLN_RGB:-FF6600}
+      - --grpc-port=9836
+      - --log-level=info
+      - --plugin-dir=/usr/local/libexec/c-lightning/plugins
+    volumes:
+      - clightning_datadir:/data
+    healthcheck:
+      test: ["CMD", "lightning-cli", "--lightning-dir=/data", "getinfo"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # RTL (Ride The Lightning) - Lightning Web UI
+  # ============================================================
+  rtl:
+    image: shahanafarooqui/rtl:${RTL_VERSION:-0.15.2}
+    restart: unless-stopped
+    depends_on:
+      clightning:
+        condition: service_healthy
+    expose:
+      - "3000"
+    environment:
+      RTL_CONFIG_PATH: /data
+      LN_IMPLEMENTATION: CLN
+      LN_SERVER_URL: http://clightning:9836
+      MACAROON_PATH: /cln-data
+      CONFIG_PATH: /cln-data
+      RTL_SSO: 0
+      RTL_PASS: ${RTL_PASSWORD:-changeme}
+      PORT: 3000
+    volumes:
+      - rtl_datadir:/data
+      - clightning_datadir:/cln-data:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Update BTCPay Server to use Lightning
+  # ============================================================
+  btcpayserver:
+    environment:
+      BTCPAY_BTCLIGHTNING: "type=clightning;server=unix://cln-data/lightning-rpc"
+    volumes:
+      - clightning_datadir:/cln-data:ro
+
+# ============================================================
+# Additional Volumes
+# ============================================================
+volumes:
+  clightning_datadir:
+  rtl_datadir:

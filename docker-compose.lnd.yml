@@ -1,0 +1,102 @@
+# ============================================================
+# LND (Lightning Network Daemon) Add-on
+# ============================================================
+# Alternative Lightning implementation using LND
+#
+# Usage:
+#   docker compose -f docker-compose.yaml -f docker-compose.lnd.yml up -d
+#
+# For Coolify:
+#   docker compose -f docker-compose.coolify.yaml -f docker-compose.lnd.yml up -d
+# ============================================================
+
+services:
+  # ============================================================
+  # LND - Lightning Network Daemon
+  # ============================================================
+  lnd:
+    image: lightninglabs/lnd:${LND_VERSION:-v0.18.4-beta}
+    restart: unless-stopped
+    depends_on:
+      bitcoind:
+        condition: service_started
+    expose:
+      - "9735"   # P2P
+      - "10009"  # gRPC
+      - "8080"   # REST
+    ports:
+      - "9735:9735"  # Lightning P2P - must be accessible
+    environment:
+      HOME: /data
+    command:
+      - --bitcoin.active
+      - --bitcoin.${BTCPAY_NETWORK:-mainnet}
+      - --bitcoin.node=bitcoind
+      - --bitcoind.rpchost=bitcoind:43782
+      - --bitcoind.rpcuser=${SERVICE_USER_BITCOIN:-btcrpc}
+      - --bitcoind.rpcpass=${SERVICE_PASSWORD_BITCOIN}
+      - --bitcoind.zmqpubrawblock=tcp://bitcoind:28332
+      - --bitcoind.zmqpubrawtx=tcp://bitcoind:28333
+      - --listen=0.0.0.0:9735
+      - --rpclisten=0.0.0.0:10009
+      - --restlisten=0.0.0.0:8080
+      - --tlsextradomain=lnd
+      - --alias=${LND_ALIAS:-BTCPay-LND}
+      - --color=${LND_COLOR:-#FF6600}
+      - --debuglevel=info
+    volumes:
+      - lnd_datadir:/data/.lnd
+    healthcheck:
+      test: ["CMD", "lncli", "--network=${BTCPAY_NETWORK:-mainnet}", "getinfo"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # ThunderHub - LND Web UI
+  # ============================================================
+  thunderhub:
+    image: apotdevin/thunderhub:${THUNDERHUB_VERSION:-v0.13.31}
+    restart: unless-stopped
+    depends_on:
+      lnd:
+        condition: service_healthy
+    expose:
+      - "3000"
+    environment:
+      ACCOUNT_CONFIG_PATH: /data/thubConfig.yaml
+      TLS_CERT_PATH: /lnd-data/tls.cert
+      MACAROON_PATH: /lnd-data/data/chain/bitcoin/${BTCPAY_NETWORK:-mainnet}/admin.macaroon
+      HOST: lnd
+      PORT: 10009
+      LOG_LEVEL: info
+    volumes:
+      - thunderhub_datadir:/data
+      - lnd_datadir:/lnd-data:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Update BTCPay Server to use LND
+  # ============================================================
+  btcpayserver:
+    environment:
+      BTCPAY_BTCLIGHTNING: "type=lnd-rest;server=https://lnd:8080/;macaroonfilepath=/lnd-data/data/chain/bitcoin/${BTCPAY_NETWORK:-mainnet}/admin.macaroon;certfilepath=/lnd-data/tls.cert"
+    volumes:
+      - lnd_datadir:/lnd-data:ro
+
+# ============================================================
+# Additional Volumes
+# ============================================================
+volumes:
+  lnd_datadir:
+  thunderhub_datadir:

@@ -1,0 +1,173 @@
+# ============================================================
+# Docker Server Blockchain - Coolify Optimized Configuration
+# ============================================================
+# This compose file is optimized for Coolify deployment using
+# Coolify's magic environment variables for automatic configuration.
+#
+# Deploy this file directly to Coolify as a Docker Compose resource.
+# ============================================================
+
+services:
+  # ============================================================
+  # BTCPay Server - Main Application
+  # ============================================================
+  btcpayserver:
+    image: btcpayserver/btcpayserver:${BTCPAY_VERSION:-2.0.6}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nbxplorer:
+        condition: service_started
+    expose:
+      - "49392"
+    environment:
+      # Coolify Magic Variables
+      BTCPAY_HOST: ${SERVICE_FQDN_BTCPAYSERVER:?Set domain in Coolify UI}
+      BTCPAY_POSTGRES: Host=postgres;Port=5432;Database=btcpay${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${SERVICE_PASSWORD_POSTGRES}
+
+      # Required with sensible defaults
+      BTCPAY_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      BTCPAY_BIND: 0.0.0.0:49392
+      BTCPAY_ROOTPATH: ${BTCPAY_ROOTPATH:-/}
+      BTCPAY_PROTOCOL: https
+
+      # NBXplorer Connection
+      BTCPAY_BTCEXPLORERURL: http://nbxplorer:32838/
+
+      # Optional features
+      BTCPAY_DOCKERDEPLOYMENT: "true"
+      BTCPAY_BTCLIGHTNING: ${BTCPAY_BTCLIGHTNING:-}
+      ASPNETCORE_ENVIRONMENT: Production
+    volumes:
+      - btcpay_datadir:/datadir
+      - nbxplorer_datadir:/root/.nbxplorer
+      - btcpay_plugins:/root/.btcpayserver/Plugins
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:49392/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+      - "coolify.port=49392"
+
+  # ============================================================
+  # NBXplorer - Bitcoin Block Explorer/Indexer
+  # ============================================================
+  nbxplorer:
+    image: nicolasdorier/nbxplorer:${NBXPLORER_VERSION:-2.5.16}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bitcoind:
+        condition: service_started
+    expose:
+      - "32838"
+    environment:
+      NBXPLORER_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      NBXPLORER_BIND: 0.0.0.0:32838
+      NBXPLORER_TRIMEVENTS: 10000
+      NBXPLORER_SIGNALFILESDIR: /datadir
+      NBXPLORER_POSTGRES: Host=postgres;Port=5432;Database=nbxplorer${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${SERVICE_PASSWORD_POSTGRES};MaxPoolSize=20;Application Name=nbxplorer
+      NBXPLORER_BTCRPCURL: http://bitcoind:43782/
+      NBXPLORER_BTCNODEENDPOINT: bitcoind:39388
+      NBXPLORER_BTCRPCUSER: ${SERVICE_USER_BITCOIN}
+      NBXPLORER_BTCRPCPASSWORD: ${SERVICE_PASSWORD_BITCOIN}
+      NBXPLORER_NOAUTH: "1"
+      NBXPLORER_EXPOSERPC: "1"
+    volumes:
+      - nbxplorer_datadir:/datadir
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32838/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Bitcoin Core - Full Node
+  # ============================================================
+  bitcoind:
+    image: btcpayserver/bitcoin:${BITCOIN_VERSION:-28.0}
+    restart: unless-stopped
+    expose:
+      - "43782"
+      - "39388"
+    environment:
+      BITCOIN_NETWORK: ${BTCPAY_NETWORK:-mainnet}
+      CREATE_WALLET: "false"
+      BITCOIN_WALLETDIR: /walletdata
+      BITCOIN_EXTRA_ARGS: |
+        server=1
+        rpcport=43782
+        rpcbind=0.0.0.0:43782
+        rpcallowip=0.0.0.0/0
+        rpcuser=${SERVICE_USER_BITCOIN}
+        rpcpassword=${SERVICE_PASSWORD_BITCOIN}
+        port=39388
+        whitelist=0.0.0.0/0
+        maxmempool=${BITCOIN_MAXMEMPOOL:-500}
+        dbcache=${BITCOIN_DBCACHE:-512}
+        prune=${BITCOIN_PRUNE:-0}
+        txindex=${BITCOIN_TXINDEX:-1}
+        zmqpubrawblock=tcp://0.0.0.0:28332
+        zmqpubrawtx=tcp://0.0.0.0:28333
+        zmqpubhashblock=tcp://0.0.0.0:28334
+    volumes:
+      - bitcoin_datadir:/data
+      - bitcoin_wallet_datadir:/walletdata
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-rpcuser=${SERVICE_USER_BITCOIN}", "-rpcpassword=${SERVICE_PASSWORD_BITCOIN}", "getblockchaininfo"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # PostgreSQL - Database
+  # ============================================================
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-16-alpine}
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: btcpay${BTCPAY_NETWORK:-mainnet}
+    command:
+      - "-c"
+      - "random_page_cost=1.0"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+    volumes:
+      - postgres_datadir:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+
+# ============================================================
+# Volumes - Persistent Data Storage
+# ============================================================
+volumes:
+  btcpay_datadir:
+  btcpay_plugins:
+  nbxplorer_datadir:
+  postgres_datadir:
+  bitcoin_datadir:
+  bitcoin_wallet_datadir:
