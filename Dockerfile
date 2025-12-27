@@ -46,7 +46,7 @@ ARG NODE_VERSION=20
 # ============================================================
 # Stage 1: Build NBXplorer
 # ============================================================
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS nbxplorer-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS nbxplorer-build
 
 ARG NBXPLORER_VERSION
 
@@ -61,7 +61,7 @@ RUN dotnet publish -c Release -o /app --self-contained false
 # ============================================================
 # Stage 2: Build BTCPay Server
 # ============================================================
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS btcpay-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS btcpay-build
 
 ARG BTCPAY_VERSION
 
