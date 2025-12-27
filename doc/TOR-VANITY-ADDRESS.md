@@ -66,32 +66,34 @@ vanity-keys/
 
 ## Using Your Vanity Address with BTCPay
 
-### Method 1: Copy Keys to Docker Volume
+The docker-compose.yaml is configured to load keys from `./secrets/tor-keys/` (gitignored).
+
+### Setup
 
 ```bash
-# Find your generated keys
-ls ./vanity-keys/
+# Create secrets directory
+mkdir -p secrets/tor-keys
 
-# Copy to the tor_keys volume location
-docker volume inspect tor_keys  # Find the mountpoint
-sudo cp ./vanity-keys/btcpay*.onion/* /var/lib/docker/volumes/tor_keys/_data/
+# Copy your generated vanity keys
+cp ./vanity-keys/YOUR_ADDRESS.onion/* secrets/tor-keys/
 
 # Set correct permissions
-sudo chown -R 100:101 /var/lib/docker/volumes/tor_keys/_data/
-sudo chmod 600 /var/lib/docker/volumes/tor_keys/_data/hs_ed25519_secret_key
+chmod 600 secrets/tor-keys/hs_ed25519_secret_key
 
-# Restart the Tor container
-docker compose restart tor
+# Start the stack
+docker compose up -d
 ```
 
-### Method 2: Mount Keys Directory
+### Custom Path (Optional)
 
-Update `docker-compose.yaml`:
-```yaml
-tor:
-  volumes:
-    - ./my-vanity-keys:/var/lib/tor/hidden_service/
-    - tor_data:/var/lib/tor/
+Override the default path via environment variable:
+```bash
+TOR_KEYS_PATH=/path/to/your/keys docker compose up -d
+```
+
+Or in `.env`:
+```bash
+TOR_KEYS_PATH=/mnt/secure/tor-keys
 ```
 
 ## Verify Your Onion Address

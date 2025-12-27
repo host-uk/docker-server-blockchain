@@ -23,3 +23,12 @@ docker-compose.override.yml
 
 # Data directories (if mounted locally)
 data/
+
+# Secrets (Tor keys, SSL certs, etc.)
+secrets/
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# Vanity key generation
+vanity-keys/
