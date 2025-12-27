@@ -17,13 +17,23 @@ services:
   btcpayserver:
     image: btcpayserver/btcpayserver:${BTCPAY_VERSION:-2.0.6}
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
       nbxplorer:
         condition: service_started
-    expose:
-      - "49392"
+      monerod:
+        condition: service_started
+      monero-wallet-rpc:
+        condition: service_started
+    ports:
+      - "49392:49392"
     environment:
       # Required - Critical configuration
       BTCPAY_HOST: ${BTCPAY_HOST:?BTCPay host domain is required}
@@ -37,7 +47,12 @@ services:
 
       # NBXplorer Connection
       BTCPAY_BTCEXPLORERURL: http://nbxplorer:32838/
+      BTCPAY_LTCEXPLORERURL: http://nbxplorer:32838/
       BTCPAY_BTCEXTERNALSSHCONNECTION: ${BTCPAY_SSH_CONNECTION:-}
+
+      # Monero Plugin Configuration
+      BTCPAY_XMR_DAEMON_URI: http://monerod:18089
+      BTCPAY_XMR_WALLET_DAEMON_URI: http://monero-wallet-rpc:18083
 
       # Optional - Features
       BTCPAY_SSHKEYFILE: ${BTCPAY_SSHKEYFILE:-}
@@ -70,10 +85,18 @@ services:
   nbxplorer:
     image: nicolasdorier/nbxplorer:${NBXPLORER_VERSION:-2.5.16}
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
       bitcoind:
+        condition: service_started
+      litecoind:
         condition: service_started
     expose:
       - "32838"
@@ -93,6 +116,12 @@ services:
       NBXPLORER_BTCRPCUSER: ${BITCOIN_RPC_USER:-rpc}
       NBXPLORER_BTCRPCPASSWORD: ${BITCOIN_RPC_PASSWORD:-rpcpassword}
 
+      # Litecoin Node Connection
+      NBXPLORER_LTCRPCURL: http://litecoind:43783/
+      NBXPLORER_LTCNODEENDPOINT: litecoind:39389
+      NBXPLORER_LTCRPCUSER: ${LITECOIN_RPC_USER:-ltcrpc}
+      NBXPLORER_LTCRPCPASSWORD: ${LITECOIN_RPC_PASSWORD:-ltcrpcpassword}
+
       # Optional - Advanced
       NBXPLORER_NOAUTH: ${NBXPLORER_NOAUTH:-1}
       NBXPLORER_EXPOSERPC: ${NBXPLORER_EXPOSERPC:-1}
@@ -111,8 +140,14 @@ services:
   # Bitcoin Core - Full Node
   # ============================================================
   bitcoind:
-    image: btcpayserver/bitcoin:${BITCOIN_VERSION:-28.0}
+    image: btcpayserver/bitcoin:${BITCOIN_VERSION:-28.1}
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
     expose:
       - "43782"  # RPC
       - "39388"  # P2P
@@ -157,6 +192,12 @@ services:
   postgres:
     image: postgres:${POSTGRES_VERSION:-16-alpine}
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 256M
     shm_size: ${POSTGRES_SHM_SIZE:-256mb}
     environment:
       # Required
@@ -190,6 +231,134 @@ services:
     labels:
       - "coolify.managed=true"
 
+  # ============================================================
+  # Litecoin Core - Full Node
+  # ============================================================
+  litecoind:
+    image: litecoinproject/litecoin-core:${LITECOIN_VERSION:-0.21.4}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    expose:
+      - "43783"  # RPC
+      - "39389"  # P2P
+      - "28335"  # ZMQ
+      - "28336"  # ZMQ
+    command:
+      - "-server=1"
+      - "-rpcport=43783"
+      - "-rpcbind=0.0.0.0:43783"
+      - "-rpcallowip=0.0.0.0/0"
+      - "-rpcuser=${LITECOIN_RPC_USER:-ltcrpc}"
+      - "-rpcpassword=${LITECOIN_RPC_PASSWORD:-ltcrpcpassword}"
+      - "-port=39389"
+      - "-whitelist=0.0.0.0/0"
+      - "-txindex=${LITECOIN_TXINDEX:-1}"
+      - "-zmqpubrawblock=tcp://0.0.0.0:28335"
+      - "-zmqpubrawtx=tcp://0.0.0.0:28336"
+      - "-deprecatedrpc=signrawtransaction"
+      - "-fallbackfee=0.0002"
+    environment:
+      LITECOIN_DATA: /data
+    volumes:
+      - litecoin_datadir:/data
+    healthcheck:
+      test: ["CMD", "litecoin-cli", "-rpcuser=${LITECOIN_RPC_USER:-ltcrpc}", "-rpcpassword=${LITECOIN_RPC_PASSWORD:-ltcrpcpassword}", "getblockchaininfo"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # MWEB Daemon - Litecoin MWEB Extension Block Support
+  # ============================================================
+  mwebd:
+    image: hectorchu1/mwebd:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    depends_on:
+      litecoind:
+        condition: service_started
+    command: -c ${BTCPAY_NETWORK:-mainnet} -p litecoind:39389
+    expose:
+      - "12345"
+    volumes:
+      - mwebd_datadir:/data
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Monero Wallet RPC - For BTCPay Monero Plugin
+  # ============================================================
+  monero-wallet-rpc:
+    image: sethsimmons/simple-monero-wallet-rpc:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    depends_on:
+      - monerod
+    command:
+      - "--daemon-host=monerod:18089"
+      - "--rpc-bind-port=18083"
+      - "--wallet-dir=/home/monero"
+      - "--disable-rpc-login"
+      - "--trusted-daemon"
+    expose:
+      - "18083"
+    volumes:
+      - monero_wallet_datadir:/home/monero
+    labels:
+      - "coolify.managed=true"
+
+  # ============================================================
+  # Monero Daemon - Full Node
+  # ============================================================
+  monerod:
+    image: sethsimmons/simple-monerod:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    command:
+      - "--rpc-restricted-bind-ip=0.0.0.0"
+      - "--rpc-restricted-bind-port=18089"
+      - "--confirm-external-bind"
+      - "--no-igd"
+      - "--no-zmq"
+      - "--prune-blockchain"
+      - "--enable-dns-blocklist"
+    expose:
+      - "18080"  # P2P
+      - "18089"  # Restricted RPC
+    volumes:
+      - monero_datadir:/home/monero/.bitmonero
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18089/get_info"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s
+    labels:
+      - "coolify.managed=true"
+
 # ============================================================
 # Volumes - Persistent Data Storage
 # ============================================================
@@ -206,3 +375,11 @@ volumes:
     name: bitcoin_datadir
   bitcoin_wallet_datadir:
     name: bitcoin_wallet_datadir
+  litecoin_datadir:
+    name: litecoin_datadir
+  mwebd_datadir:
+    name: mwebd_datadir
+  monero_datadir:
+    name: monero_datadir
+  monero_wallet_datadir:
+    name: monero_wallet_datadir

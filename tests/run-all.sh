@@ -18,6 +18,7 @@ NC='\033[0m'
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}       BTCPay Server AIO - Test Suite                     ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}       (Bitcoin + Monero + Mempool Explorer)              ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -31,8 +32,8 @@ run_test_suite() {
 
     echo -e "${BLUE}Running: $name${NC}"
 
-    if [ -x "$script" ]; then
-        if "$script"; then
+    if [ -f "$script" ]; then
+        if sh "$script"; then
             echo -e "${GREEN}✓ $name passed${NC}"
         else
             echo -e "${RED}✗ $name failed${NC}"
@@ -40,17 +41,45 @@ run_test_suite() {
         fi
         SUITES_RUN=$((SUITES_RUN + 1))
     else
-        echo -e "${RED}Script not found or not executable: $script${NC}"
+        echo -e "${RED}Script not found: $script${NC}"
         TOTAL_FAILED=$((TOTAL_FAILED + 1))
     fi
 
     echo ""
 }
 
+show_help() {
+    cat <<EOF
+BTCPay AIO Test Suite
+
+Usage: $0 [OPTION]
+
+Options:
+  build      Run build tests only (no services needed)
+  config     Run config tests (services must be initialized)
+  services   Run service tests (services must be running)
+  backup     Run backup tests (services must be running)
+  all        Run all tests
+  help       Show this help
+
+Test Levels:
+  - build:    Tests image structure without running services
+  - config:   Tests configuration after entrypoint runs
+  - services: Tests running services (requires all services up)
+  - backup:   Tests backup script functionality
+
+Examples:
+  $0 build                # Quick build verification
+  $0 all                  # Full test suite (requires running container)
+
+EOF
+}
+
 # Parse arguments
-RUN_BUILD=true
+RUN_BUILD=false
 RUN_CONFIG=false
 RUN_SERVICES=false
+RUN_BACKUP=false
 
 case "${1:-build}" in
     build)
@@ -62,18 +91,23 @@ case "${1:-build}" in
     services)
         RUN_SERVICES=true
         ;;
+    backup)
+        RUN_BACKUP=true
+        ;;
     all)
         RUN_BUILD=true
         RUN_CONFIG=true
         RUN_SERVICES=true
+        RUN_BACKUP=true
+        ;;
+    help|--help|-h)
+        show_help
+        exit 0
         ;;
     *)
-        echo "Usage: $0 [build|config|services|all]"
+        echo "Unknown option: $1"
         echo ""
-        echo "  build    - Run build tests only (default, no services needed)"
-        echo "  config   - Run config tests (services must be initialized)"
-        echo "  services - Run service tests (services must be running)"
-        echo "  all      - Run all tests"
+        show_help
         exit 1
         ;;
 esac
@@ -89,6 +123,10 @@ fi
 
 if [ "$RUN_SERVICES" = true ]; then
     run_test_suite "Service Tests" "$SCRIPT_DIR/test-services.sh"
+fi
+
+if [ "$RUN_BACKUP" = true ]; then
+    run_test_suite "Backup Tests" "$SCRIPT_DIR/test-backup.sh"
 fi
 
 # Final summary

@@ -1,0 +1,22 @@
+.Intra {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: center;
+    justify-items: center;
+    
+    position: absolute;
+    top: calc(50% - 300px);
+    width: 100%;
+}
+
+.AmountNode {    
+    height: 135px;
+    width: 135px;
+
+    background-color: #C093D6;
+    border: 6px solid #FFFFFF;
+    border-radius: 10%;
+    box-sizing: border-box;
+
+    cursor: pointer;
+}

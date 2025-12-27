@@ -1,46 +1,55 @@
 #!/bin/bash
 # ============================================================
-# Docker Server Blockchain - Health Check Script
+# BTCPay AIO Health Check Script
 # ============================================================
-# Verifies all services are running correctly
+# Used by Docker HEALTHCHECK to verify all services
 # ============================================================
 
 set -e
 
-echo "==================================="
-echo "Docker Server Blockchain Health Check"
-echo "==================================="
-
-check_service() {
-    local service=$1
-    local status=$(docker compose ps --format json "$service" 2>/dev/null | jq -r '.Health // .State' 2>/dev/null || echo "unknown")
-
-    if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
-        echo "  $service: OK ($status)"
-        return 0
-    else
-        echo "  $service: FAIL ($status)"
-        return 1
-    fi
+# Check PostgreSQL
+pg_isready -U "${POSTGRES_USER:-btcpay}" -q || {
+    echo "PostgreSQL is not ready"
+    exit 1
 }
 
-echo ""
-echo "Service Status:"
-echo "---------------"
-
-FAILED=0
-
-check_service "btcpayserver" || FAILED=$((FAILED + 1))
-check_service "nbxplorer" || FAILED=$((FAILED + 1))
-check_service "bitcoind" || FAILED=$((FAILED + 1))
-check_service "postgres" || FAILED=$((FAILED + 1))
-
-echo ""
-
-if [ $FAILED -eq 0 ]; then
-    echo "All services healthy!"
-    exit 0
-else
-    echo "$FAILED service(s) unhealthy"
+# Check Bitcoin Core RPC
+bitcoin-cli \
+    -rpcuser="${BITCOIN_RPC_USER:-btcpayrpc}" \
+    -rpcpassword="${BITCOIN_RPC_PASSWORD}" \
+    -rpcport="${BITCOIN_RPC_PORT:-8332}" \
+    getblockchaininfo > /dev/null 2>&1 || {
+    echo "Bitcoin Core RPC is not responding"
     exit 1
-fi
+}
+
+# Check Monero RPC
+curl -sf \
+    -u "${MONERO_RPC_USER:-monerorpc}:${MONERO_RPC_PASSWORD}" \
+    http://127.0.0.1:${XMR_RPC_PORT:-18081}/json_rpc \
+    -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' \
+    -H 'Content-Type: application/json' > /dev/null 2>&1 || {
+    echo "Monero RPC is not responding"
+    exit 1
+}
+
+# Check NBXplorer
+curl -sf http://127.0.0.1:32838/health > /dev/null || {
+    echo "NBXplorer health check failed"
+    exit 1
+}
+
+# Check BTCPay Server
+curl -sf http://127.0.0.1:49392/health > /dev/null || {
+    echo "BTCPay Server health check failed"
+    exit 1
+}
+
+# Check Mempool (optional - may take time to sync)
+curl -sf http://127.0.0.1:8999/api/v1/backend-info > /dev/null 2>&1 || {
+    echo "Mempool backend not ready (may still be syncing)"
+    # Don't fail on mempool - it takes time to sync
+}
+
+echo "All services healthy"
+exit 0
