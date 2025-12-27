@@ -359,6 +359,35 @@ services:
     labels:
       - "coolify.managed=true"
 
+  # ============================================================
+  # Tor Hidden Service - Anonymous Access to BTCPay
+  # ============================================================
+  tor:
+    image: goldy/tor-hidden-service:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    depends_on:
+      - btcpayserver
+    environment:
+      # Service name and target
+      BTCPAY_TOR_SERVICE_HOSTS: "80:btcpayserver:49392"
+      BTCPAY_TOR_SERVICE_VERSION: "3"
+      # Optional: Use a pre-generated vanity key
+      # Place your vanity key files in the tor_keys volume:
+      #   - hs_ed25519_secret_key
+      #   - hs_ed25519_public_key
+      #   - hostname
+    volumes:
+      - tor_keys:/var/lib/tor/hidden_service/
+      - tor_data:/var/lib/tor/
+    labels:
+      - "coolify.managed=true"
+
 # ============================================================
 # Volumes - Persistent Data Storage
 # ============================================================
@@ -383,3 +412,7 @@ volumes:
     name: monero_datadir
   monero_wallet_datadir:
     name: monero_wallet_datadir
+  tor_keys:
+    name: tor_keys
+  tor_data:
+    name: tor_data
