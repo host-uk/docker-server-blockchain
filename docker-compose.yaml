@@ -4,12 +4,8 @@
 # Deploy this file directly to Coolify as a Docker Compose resource.
 #
 # Volume Architecture (matches Dockerfile AIO):
-#   /config    -> NVMe RAID 1 (critical data, BACKED UP)
-#   /chaindata -> HDD (expendable blockchain data, NOT backed up)
-#
-# Set these in Coolify or .env:
-#   CONFIG_PATH=/mnt/nvme/btcpay      (or leave empty for named volumes)
-#   CHAINDATA_PATH=/mnt/hdd/btcpay    (or leave empty for named volumes)
+#   Config volumes   -> NVMe RAID 1 (critical data, BACKED UP)
+#   Chaindata volumes -> HDD (expendable blockchain data, NOT backed up)
 #
 # Coolify Magic Variables Used:
 #   - SERVICE_FQDN_BTCPAYSERVER_49392: BTCPay Server domain (required)
@@ -73,10 +69,10 @@ services:
       BTCPAY_BTCLIGHTNING: ${BTCPAY_BTCLIGHTNING:-}
       ASPNETCORE_ENVIRONMENT: Production
     volumes:
-      # Config volume (NVMe - critical, backed up)
-      - ${CONFIG_PATH:+${CONFIG_PATH}/btcpay}${CONFIG_PATH:-btcpay_datadir}:/datadir
-      - ${CONFIG_PATH:+${CONFIG_PATH}/nbxplorer}${CONFIG_PATH:-nbxplorer_datadir}:/root/.nbxplorer
-      - ${CONFIG_PATH:+${CONFIG_PATH}/btcpay-plugins}${CONFIG_PATH:-btcpay_plugins}:/root/.btcpayserver/Plugins
+      # Config volumes (NVMe - critical, backed up)
+      - btcpay_datadir:/datadir
+      - nbxplorer_datadir:/root/.nbxplorer
+      - btcpay_plugins:/root/.btcpayserver/Plugins
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:49392/"]
       interval: 30s
@@ -131,7 +127,7 @@ services:
       NBXPLORER_EXPOSERPC: "1"
     volumes:
       # Config volume (NVMe - critical, backed up)
-      - ${CONFIG_PATH:+${CONFIG_PATH}/nbxplorer}${CONFIG_PATH:-nbxplorer_datadir}:/datadir
+      - nbxplorer_datadir:/datadir
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:32838/health"]
       interval: 30s
@@ -177,9 +173,9 @@ services:
         zmqpubrawtx=tcp://0.0.0.0:28333
         zmqpubhashblock=tcp://0.0.0.0:28334
     volumes:
-      # Chaindata volume (HDD - expendable, NOT backed up)
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/btc}${CHAINDATA_PATH:-bitcoin_datadir}:/data
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/btc-wallet}${CHAINDATA_PATH:-bitcoin_wallet_datadir}:/walletdata
+      # Chaindata volumes (HDD - expendable, NOT backed up)
+      - bitcoin_datadir:/data
+      - bitcoin_wallet_datadir:/walletdata
     healthcheck:
       test: ["CMD", "bitcoin-cli", "-rpcuser=${SERVICE_USER_BITCOIN}", "-rpcpassword=${SERVICE_PASSWORD_BITCOIN}", "getblockchaininfo"]
       interval: 60s
@@ -224,7 +220,7 @@ services:
       LITECOIN_DATA: /data
     volumes:
       # Chaindata volume (HDD - expendable, NOT backed up)
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/ltc}${CHAINDATA_PATH:-litecoin_datadir}:/data
+      - litecoin_datadir:/data
     healthcheck:
       test: ["CMD", "litecoin-cli", "-rpcuser=${SERVICE_USER_LITECOIN}", "-rpcpassword=${SERVICE_PASSWORD_LITECOIN}", "getblockchaininfo"]
       interval: 60s
@@ -254,7 +250,7 @@ services:
       - "12345"
     volumes:
       # Chaindata volume (HDD - expendable, NOT backed up)
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/mwebd}${CHAINDATA_PATH:-mwebd_datadir}:/data
+      - mwebd_datadir:/data
     labels:
       - "coolify.managed=true"
 
@@ -283,7 +279,7 @@ services:
       - "18089"
     volumes:
       # Chaindata volume (HDD - expendable, NOT backed up)
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/xmr}${CHAINDATA_PATH:-monero_datadir}:/home/monero/.bitmonero
+      - monero_datadir:/home/monero/.bitmonero
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18089/get_info"]
       interval: 60s
@@ -317,7 +313,7 @@ services:
       - "18083"
     volumes:
       # Config volume (NVMe - critical, backed up) - wallet data is critical!
-      - ${CONFIG_PATH:+${CONFIG_PATH}/xmr-wallet}${CONFIG_PATH:-monero_wallet_datadir}:/home/monero
+      - monero_wallet_datadir:/home/monero
     labels:
       - "coolify.managed=true"
 
@@ -352,7 +348,7 @@ services:
       - "effective_cache_size=1GB"
     volumes:
       # Config volume (NVMe - critical, backed up)
-      - ${CONFIG_PATH:+${CONFIG_PATH}/postgres}${CONFIG_PATH:-postgres_datadir}:/var/lib/postgresql/data
+      - postgres_datadir:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -430,7 +426,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MARIADB}
     volumes:
       # Chaindata volume (HDD - expendable, NOT backed up)
-      - ${CHAINDATA_PATH:+${CHAINDATA_PATH}/mempool-db}${CHAINDATA_PATH:-mempool_db_datadir}:/var/lib/mysql
+      - mempool_db_datadir:/var/lib/mysql
     labels:
       - "coolify.managed=true"
 
@@ -452,19 +448,23 @@ services:
       BTCPAY_TOR_SERVICE_HOSTS: "80:btcpayserver:49392"
       BTCPAY_TOR_SERVICE_VERSION: "3"
     volumes:
-      # Config volume (NVMe - critical, backed up) - Tor keys are critical!
-      - ${CONFIG_PATH:+${CONFIG_PATH}/tor-keys}${CONFIG_PATH:-tor_keys}:/var/lib/tor/hidden_service/btcpay
-      - ${CONFIG_PATH:+${CONFIG_PATH}/tor-data}${CONFIG_PATH:-tor_data}:/var/lib/tor/
+      # Config volumes (NVMe - critical, backed up) - Tor keys are critical!
+      - tor_keys:/var/lib/tor/hidden_service/btcpay
+      - tor_data:/var/lib/tor/
     labels:
       - "coolify.managed=true"
 
 # ============================================================
 # Volumes - Persistent Data Storage
 # ============================================================
-# These are used when CONFIG_PATH/CHAINDATA_PATH are not set.
-# For production, set CONFIG_PATH and CHAINDATA_PATH to bind mounts:
-#   CONFIG_PATH=/mnt/nvme/btcpay (NVMe RAID 1, backed up)
-#   CHAINDATA_PATH=/mnt/hdd/btcpay (HDD, expendable)
+# Volume Architecture:
+#   Config volumes (NVMe RAID 1 - CRITICAL, backed up):
+#     - btcpay_datadir, btcpay_plugins, nbxplorer_datadir
+#     - postgres_datadir, monero_wallet_datadir, tor_keys, tor_data
+#
+#   Chaindata volumes (HDD - expendable, NOT backed up):
+#     - bitcoin_datadir, bitcoin_wallet_datadir, litecoin_datadir
+#     - mwebd_datadir, monero_datadir, mempool_db_datadir
 # ============================================================
 volumes:
   # Config volumes (NVMe - CRITICAL, backed up)
