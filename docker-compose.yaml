@@ -1,468 +1,76 @@
 # ============================================================
-# Docker Server Blockchain - Coolify Optimized Configuration
+# Docker Server Blockchain - BTCPay AIO
 # ============================================================
-# Deploy this file directly to Coolify as a Docker Compose resource.
+# All-in-One BTCPay Server with Bitcoin, Litecoin, Monero
 #
-# Volume Architecture (matches Dockerfile AIO):
-#   /config           -> NVMe RAID 1 (critical data, BACKED UP)
-#   /drive/blockchain -> HDD (expendable blockchain data, NOT backed up)
+# Volume Architecture:
+#   /config    -> NVMe RAID 1 (critical data, BACKED UP)
+#   /chaindata -> HDD (expendable blockchain data, NOT backed up)
 #
-# Coolify Magic Variables Used:
-#   - SERVICE_FQDN_BTCPAYSERVER_49392: BTCPay Server domain (required)
-#   - SERVICE_PASSWORD_POSTGRES: Auto-generated PostgreSQL password
-#   - SERVICE_PASSWORD_BITCOIN: Auto-generated Bitcoin RPC password
-#   - SERVICE_USER_BITCOIN: Auto-generated Bitcoin RPC username
-#   - SERVICE_PASSWORD_LITECOIN: Auto-generated Litecoin RPC password
-#   - SERVICE_USER_LITECOIN: Auto-generated Litecoin RPC username
-#   - SERVICE_PASSWORD_MEMPOOL: Auto-generated Mempool DB password
-#
-# Port Strategy:
-#   - ports: internal services (not exposed to Coolify proxy)
-#   - expose: external services (routed through Coolify proxy)
+# Coolify Magic Variables:
+#   - SERVICE_FQDN_BTCPAY_80: BTCPay Server domain
+#   - SERVICE_PASSWORD_POSTGRES: PostgreSQL password
+#   - SERVICE_PASSWORD_BITCOIN: Bitcoin RPC password
 # ============================================================
 
 services:
-  # ============================================================
-  # BTCPay Server - Main Application (EXTERNAL)
-  # ============================================================
-  btcpayserver:
-    image: btcpayserver/btcpayserver:${BTCPAY_VERSION:-2.0.6}
+  btcpay:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 16G
         reservations:
-          memory: 512M
-    depends_on:
-      postgres:
-        condition: service_healthy
-      nbxplorer:
-        condition: service_started
-      monerod:
-        condition: service_started
-      monero-wallet-rpc:
-        condition: service_started
+          memory: 4G
     expose:
-      - "49392"
+      - "80"
+      - "443"
+    ports:
+      - "8333"   # Bitcoin P2P
+      - "18080"  # Monero P2P
     environment:
-      # Coolify Magic - Domain auto-configured from UI
-      BTCPAY_HOST: ${SERVICE_FQDN_BTCPAYSERVER_49392}
-      BTCPAY_POSTGRES: Host=postgres;Port=5432;Database=btcpay${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${SERVICE_PASSWORD_POSTGRES}
+      # Domain
+      BTCPAY_HOST: ${SERVICE_FQDN_BTCPAY_80:-localhost}
+      DOMAIN: ${SERVICE_FQDN_BTCPAY_80:-localhost}
 
-      # Network configuration
+      # Network
       BTCPAY_NETWORK: ${BTCPAY_NETWORK:-mainnet}
-      BTCPAY_BIND: 0.0.0.0:49392
-      BTCPAY_ROOTPATH: /
       BTCPAY_PROTOCOL: https
 
-      # NBXplorer Connection
-      BTCPAY_BTCEXPLORERURL: http://nbxplorer:32838/
-      BTCPAY_LTCEXPLORERURL: http://nbxplorer:32838/
-
-      # Monero Plugin Configuration
-      BTCPAY_XMR_DAEMON_URI: http://monerod:18089
-      BTCPAY_XMR_WALLET_DAEMON_URI: http://monero-wallet-rpc:18083
-
-      # Features
-      BTCPAY_DOCKERDEPLOYMENT: "true"
-      BTCPAY_BTCLIGHTNING: ${BTCPAY_BTCLIGHTNING:-}
-      ASPNETCORE_ENVIRONMENT: Production
-    volumes:
-      # Config (NVMe - critical, backed up)
-      - ./config/btcpay:/datadir
-      - ./config/nbxplorer:/root/.nbxplorer
-      - ./config/btcpay-plugins:/root/.btcpayserver/Plugins
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:49392/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    labels:
-      - "coolify.managed=true"
-      - "coolify.port=49392"
-
-  # ============================================================
-  # NBXplorer - Bitcoin/Litecoin Block Indexer (INTERNAL)
-  # ============================================================
-  nbxplorer:
-    image: nicolasdorier/nbxplorer:${NBXPLORER_VERSION:-2.5.16}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 256M
-    depends_on:
-      postgres:
-        condition: service_healthy
-      bitcoind:
-        condition: service_started
-      litecoind:
-        condition: service_started
-    ports:
-      - "32838"
-    environment:
-      NBXPLORER_NETWORK: ${BTCPAY_NETWORK:-mainnet}
-      NBXPLORER_BIND: 0.0.0.0:32838
-      NBXPLORER_TRIMEVENTS: 10000
-      NBXPLORER_SIGNALFILESDIR: /datadir
-      NBXPLORER_POSTGRES: Host=postgres;Port=5432;Database=nbxplorer${BTCPAY_NETWORK:-mainnet};Username=postgres;Password=${SERVICE_PASSWORD_POSTGRES};MaxPoolSize=20;Application Name=nbxplorer
-
-      # Bitcoin Node Connection
-      NBXPLORER_BTCRPCURL: http://bitcoind:43782/
-      NBXPLORER_BTCNODEENDPOINT: bitcoind:39388
-      NBXPLORER_BTCRPCUSER: ${SERVICE_USER_BITCOIN}
-      NBXPLORER_BTCRPCPASSWORD: ${SERVICE_PASSWORD_BITCOIN}
-
-      # Litecoin Node Connection
-      NBXPLORER_LTCRPCURL: http://litecoind:43783/
-      NBXPLORER_LTCNODEENDPOINT: litecoind:39389
-      NBXPLORER_LTCRPCUSER: ${SERVICE_USER_LITECOIN}
-      NBXPLORER_LTCRPCPASSWORD: ${SERVICE_PASSWORD_LITECOIN}
-
-      NBXPLORER_NOAUTH: "1"
-      NBXPLORER_EXPOSERPC: "1"
-    volumes:
-      # Config (NVMe - critical, backed up)
-      - ./config/nbxplorer:/datadir
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:32838/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # Bitcoin Core - Full Node (INTERNAL)
-  # ============================================================
-  bitcoind:
-    image: btcpayserver/bitcoin:${BITCOIN_VERSION:-28.1}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 2G
-    ports:
-      - "43782"
-      - "39388"
-    environment:
-      BITCOIN_NETWORK: ${BTCPAY_NETWORK:-mainnet}
-      CREATE_WALLET: "false"
-      BITCOIN_WALLETDIR: /walletdata
-      BITCOIN_EXTRA_ARGS: |
-        server=1
-        rpcport=43782
-        rpcbind=0.0.0.0:43782
-        rpcallowip=0.0.0.0/0
-        rpcuser=${SERVICE_USER_BITCOIN}
-        rpcpassword=${SERVICE_PASSWORD_BITCOIN}
-        port=39388
-        whitelist=0.0.0.0/0
-        maxmempool=${BITCOIN_MAXMEMPOOL:-500}
-        dbcache=${BITCOIN_DBCACHE:-512}
-        prune=${BITCOIN_PRUNE:-0}
-        txindex=${BITCOIN_TXINDEX:-1}
-        zmqpubrawblock=tcp://0.0.0.0:28332
-        zmqpubrawtx=tcp://0.0.0.0:28333
-        zmqpubhashblock=tcp://0.0.0.0:28334
-    volumes:
-      # Chaindata (HDD - expendable, NOT backed up)
-      - ./drive/btc:/data
-      - ./drive/btc-wallet:/walletdata
-    healthcheck:
-      test: ["CMD", "bitcoin-cli", "-rpcuser=${SERVICE_USER_BITCOIN}", "-rpcpassword=${SERVICE_PASSWORD_BITCOIN}", "getblockchaininfo"]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 300s
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # Litecoin Core - Full Node (INTERNAL)
-  # ============================================================
-  litecoind:
-    image: litecoinproject/litecoin-core:${LITECOIN_VERSION:-0.21.4}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 1G
-    ports:
-      - "43783"
-      - "39389"
-      - "28335"
-      - "28336"
-    command:
-      - "-server=1"
-      - "-rpcport=43783"
-      - "-rpcbind=0.0.0.0:43783"
-      - "-rpcallowip=0.0.0.0/0"
-      - "-rpcuser=${SERVICE_USER_LITECOIN}"
-      - "-rpcpassword=${SERVICE_PASSWORD_LITECOIN}"
-      - "-port=39389"
-      - "-whitelist=0.0.0.0/0"
-      - "-txindex=${LITECOIN_TXINDEX:-1}"
-      - "-zmqpubrawblock=tcp://0.0.0.0:28335"
-      - "-zmqpubrawtx=tcp://0.0.0.0:28336"
-      - "-deprecatedrpc=signrawtransaction"
-      - "-fallbackfee=0.0002"
-    environment:
-      LITECOIN_DATA: /data
-    volumes:
-      # Chaindata (HDD - expendable, NOT backed up)
-      - ./drive/ltc:/data
-    healthcheck:
-      test: ["CMD", "litecoin-cli", "-rpcuser=${SERVICE_USER_LITECOIN}", "-rpcpassword=${SERVICE_PASSWORD_LITECOIN}", "getblockchaininfo"]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 300s
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # MWEB Daemon - Litecoin MWEB Extension Block Support (INTERNAL)
-  # ============================================================
-  mwebd:
-    image: hectorchu1/mwebd:latest
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
-    depends_on:
-      litecoind:
-        condition: service_started
-    command: -c ${BTCPAY_NETWORK:-mainnet} -p litecoind:39389
-    ports:
-      - "12345"
-    volumes:
-      # Chaindata (HDD - expendable, NOT backed up)
-      - ./drive/mwebd:/data
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # Monero Daemon - Full Node (INTERNAL)
-  # ============================================================
-  monerod:
-    image: sethsimmons/simple-monerod:latest
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 1G
-    command:
-      - "--rpc-restricted-bind-ip=0.0.0.0"
-      - "--rpc-restricted-bind-port=18089"
-      - "--confirm-external-bind"
-      - "--no-igd"
-      - "--no-zmq"
-      - "--prune-blockchain"
-      - "--enable-dns-blocklist"
-    ports:
-      - "18080"
-      - "18089"
-    volumes:
-      # Chaindata (HDD - expendable, NOT backed up)
-      - ./drive/xmr:/home/monero/.bitmonero
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18089/get_info"]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 300s
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # Monero Wallet RPC - For BTCPay Monero Plugin (INTERNAL)
-  # ============================================================
-  monero-wallet-rpc:
-    image: sethsimmons/simple-monero-wallet-rpc:latest
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 256M
-    depends_on:
-      - monerod
-    command:
-      - "--daemon-host=monerod:18089"
-      - "--rpc-bind-port=18083"
-      - "--wallet-dir=/home/monero"
-      - "--disable-rpc-login"
-      - "--trusted-daemon"
-    ports:
-      - "18083"
-    volumes:
-      # Config (NVMe - critical, backed up) - wallet data is critical!
-      - ./config/xmr-wallet:/home/monero
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # PostgreSQL - Database (INTERNAL)
-  # ============================================================
-  postgres:
-    image: postgres:${POSTGRES_VERSION:-16-alpine}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 256M
-    shm_size: 256mb
-    environment:
+      # Credentials (Coolify auto-generates these)
       POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      POSTGRES_USER: postgres
-      POSTGRES_DB: btcpay${BTCPAY_NETWORK:-mainnet}
-      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
-    command:
-      - "-c"
-      - "random_page_cost=1.0"
-      - "-c"
-      - "shared_preload_libraries=pg_stat_statements"
-      - "-c"
-      - "max_connections=200"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "effective_cache_size=1GB"
+      BITCOIN_RPC_USER: ${SERVICE_USER_BITCOIN:-btcrpc}
+      BITCOIN_RPC_PASSWORD: ${SERVICE_PASSWORD_BITCOIN}
+      MONERO_RPC_PASSWORD: ${SERVICE_PASSWORD_MONERO}
+
+      # Bitcoin tuning
+      BITCOIN_PRUNE: ${BITCOIN_PRUNE:-0}
+      BITCOIN_DBCACHE: ${BITCOIN_DBCACHE:-4096}
+      BITCOIN_MAXMEMPOOL: ${BITCOIN_MAXMEMPOOL:-1000}
+      BITCOIN_TXINDEX: ${BITCOIN_TXINDEX:-1}
+
+      # Monero tuning
+      MONERO_PRUNE: ${MONERO_PRUNE:-0}
     volumes:
       # Config (NVMe - critical, backed up)
-      - ./config/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "coolify.managed=true"
-
-  # ============================================================
-  # Mempool - Bitcoin Block Explorer (EXTERNAL - optional)
-  # ============================================================
-  mempool-web:
-    image: mempool/frontend:${MEMPOOL_VERSION:-v3.0.0}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
-    depends_on:
-      - mempool-api
-    expose:
-      - "8080"
-    environment:
-      FRONTEND_HTTP_PORT: "8080"
-      BACKEND_MAINNET_HTTP_HOST: mempool-api
-    labels:
-      - "coolify.managed=true"
-      - "coolify.port=8080"
-
-  mempool-api:
-    image: mempool/backend:${MEMPOOL_VERSION:-v3.0.0}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 512M
-    depends_on:
-      - mempool-db
-      - bitcoind
-    ports:
-      - "8999"
-    environment:
-      MEMPOOL_BACKEND: electrum
-      CORE_RPC_HOST: bitcoind
-      CORE_RPC_PORT: "43782"
-      CORE_RPC_USERNAME: ${SERVICE_USER_BITCOIN}
-      CORE_RPC_PASSWORD: ${SERVICE_PASSWORD_BITCOIN}
-      DATABASE_ENABLED: "true"
-      DATABASE_HOST: mempool-db
-      DATABASE_DATABASE: mempool
-      DATABASE_USERNAME: mempool
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_MEMPOOL}
-      STATISTICS_ENABLED: "true"
-    labels:
-      - "coolify.managed=true"
-
-  mempool-db:
-    image: mariadb:${MARIADB_VERSION:-10.11}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 256M
-    environment:
-      MYSQL_DATABASE: mempool
-      MYSQL_USER: mempool
-      MYSQL_PASSWORD: ${SERVICE_PASSWORD_MEMPOOL}
-      MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MARIADB}
-    volumes:
+      - config:/config
       # Chaindata (HDD - expendable, NOT backed up)
-      - ./drive/mempool-db:/var/lib/mysql
+      - chaindata:/chaindata
+    healthcheck:
+      test: ["CMD", "/scripts/health-check.sh"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 600s
     labels:
       - "coolify.managed=true"
+      - "coolify.port=80"
 
-  # ============================================================
-  # Tor Hidden Service - Anonymous Access to BTCPay (INTERNAL)
-  # ============================================================
-  tor:
-    image: goldy/tor-hidden-service:latest
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 64M
-    depends_on:
-      - btcpayserver
-    environment:
-      BTCPAY_TOR_SERVICE_HOSTS: "80:btcpayserver:49392"
-      BTCPAY_TOR_SERVICE_VERSION: "3"
-    volumes:
-      # Config (NVMe - critical, backed up) - Tor keys are critical!
-      - ./config/tor-keys:/var/lib/tor/hidden_service/btcpay
-      - ./config/tor-data:/var/lib/tor/
-    labels:
-      - "coolify.managed=true"
-
-# ============================================================
-# Volume Architecture - Bind Mounts
-# ============================================================
-# Config (/config -> NVMe RAID 1 - CRITICAL, backed up):
-#   ./config/btcpay, ./config/btcpay-plugins, ./config/nbxplorer
-#   ./config/postgres, ./config/xmr-wallet, ./config/tor-keys, ./config/tor-data
-#
-# Chaindata (/drive/blockchain -> HDD - expendable, NOT backed up):
-#   ./drive/btc, ./drive/btc-wallet
-#   ./drive/ltc, ./drive/mwebd
-#   ./drive/xmr, ./drive/mempool-db
-# ============================================================
+volumes:
+  config:
+    name: btcpay_config
+  chaindata:
+    name: btcpay_chaindata
