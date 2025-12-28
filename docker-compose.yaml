@@ -4,8 +4,8 @@
 # Deploy this file directly to Coolify as a Docker Compose resource.
 #
 # Volume Architecture (matches Dockerfile AIO):
-#   Config volumes   -> NVMe RAID 1 (critical data, BACKED UP)
-#   Chaindata volumes -> HDD (expendable blockchain data, NOT backed up)
+#   /config           -> NVMe RAID 1 (critical data, BACKED UP)
+#   /drive/blockchain -> HDD (expendable blockchain data, NOT backed up)
 #
 # Coolify Magic Variables Used:
 #   - SERVICE_FQDN_BTCPAYSERVER_49392: BTCPay Server domain (required)
@@ -69,10 +69,10 @@ services:
       BTCPAY_BTCLIGHTNING: ${BTCPAY_BTCLIGHTNING:-}
       ASPNETCORE_ENVIRONMENT: Production
     volumes:
-      # Config volumes (NVMe - critical, backed up)
-      - btcpay_datadir:/datadir
-      - nbxplorer_datadir:/root/.nbxplorer
-      - btcpay_plugins:/root/.btcpayserver/Plugins
+      # Config (NVMe - critical, backed up)
+      - /config/btcpay:/datadir
+      - /config/nbxplorer:/root/.nbxplorer
+      - /config/btcpay-plugins:/root/.btcpayserver/Plugins
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:49392/"]
       interval: 30s
@@ -126,8 +126,8 @@ services:
       NBXPLORER_NOAUTH: "1"
       NBXPLORER_EXPOSERPC: "1"
     volumes:
-      # Config volume (NVMe - critical, backed up)
-      - nbxplorer_datadir:/datadir
+      # Config (NVMe - critical, backed up)
+      - /config/nbxplorer:/datadir
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:32838/health"]
       interval: 30s
@@ -173,9 +173,9 @@ services:
         zmqpubrawtx=tcp://0.0.0.0:28333
         zmqpubhashblock=tcp://0.0.0.0:28334
     volumes:
-      # Chaindata volumes (HDD - expendable, NOT backed up)
-      - bitcoin_datadir:/data
-      - bitcoin_wallet_datadir:/walletdata
+      # Chaindata (HDD - expendable, NOT backed up)
+      - /drive/blockchain/btc:/data
+      - /drive/blockchain/btc-wallet:/walletdata
     healthcheck:
       test: ["CMD", "bitcoin-cli", "-rpcuser=${SERVICE_USER_BITCOIN}", "-rpcpassword=${SERVICE_PASSWORD_BITCOIN}", "getblockchaininfo"]
       interval: 60s
@@ -219,8 +219,8 @@ services:
     environment:
       LITECOIN_DATA: /data
     volumes:
-      # Chaindata volume (HDD - expendable, NOT backed up)
-      - litecoin_datadir:/data
+      # Chaindata (HDD - expendable, NOT backed up)
+      - /drive/blockchain/ltc:/data
     healthcheck:
       test: ["CMD", "litecoin-cli", "-rpcuser=${SERVICE_USER_LITECOIN}", "-rpcpassword=${SERVICE_PASSWORD_LITECOIN}", "getblockchaininfo"]
       interval: 60s
@@ -249,8 +249,8 @@ services:
     ports:
       - "12345"
     volumes:
-      # Chaindata volume (HDD - expendable, NOT backed up)
-      - mwebd_datadir:/data
+      # Chaindata (HDD - expendable, NOT backed up)
+      - /drive/blockchain/mwebd:/data
     labels:
       - "coolify.managed=true"
 
@@ -278,8 +278,8 @@ services:
       - "18080"
       - "18089"
     volumes:
-      # Chaindata volume (HDD - expendable, NOT backed up)
-      - monero_datadir:/home/monero/.bitmonero
+      # Chaindata (HDD - expendable, NOT backed up)
+      - /drive/blockchain/xmr:/home/monero/.bitmonero
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18089/get_info"]
       interval: 60s
@@ -312,8 +312,8 @@ services:
     ports:
       - "18083"
     volumes:
-      # Config volume (NVMe - critical, backed up) - wallet data is critical!
-      - monero_wallet_datadir:/home/monero
+      # Config (NVMe - critical, backed up) - wallet data is critical!
+      - /config/xmr-wallet:/home/monero
     labels:
       - "coolify.managed=true"
 
@@ -347,8 +347,8 @@ services:
       - "-c"
       - "effective_cache_size=1GB"
     volumes:
-      # Config volume (NVMe - critical, backed up)
-      - postgres_datadir:/var/lib/postgresql/data
+      # Config (NVMe - critical, backed up)
+      - /config/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -425,8 +425,8 @@ services:
       MYSQL_PASSWORD: ${SERVICE_PASSWORD_MEMPOOL}
       MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MARIADB}
     volumes:
-      # Chaindata volume (HDD - expendable, NOT backed up)
-      - mempool_db_datadir:/var/lib/mysql
+      # Chaindata (HDD - expendable, NOT backed up)
+      - /drive/blockchain/mempool-db:/var/lib/mysql
     labels:
       - "coolify.managed=true"
 
@@ -448,37 +448,21 @@ services:
       BTCPAY_TOR_SERVICE_HOSTS: "80:btcpayserver:49392"
       BTCPAY_TOR_SERVICE_VERSION: "3"
     volumes:
-      # Config volumes (NVMe - critical, backed up) - Tor keys are critical!
-      - tor_keys:/var/lib/tor/hidden_service/btcpay
-      - tor_data:/var/lib/tor/
+      # Config (NVMe - critical, backed up) - Tor keys are critical!
+      - /config/tor-keys:/var/lib/tor/hidden_service/btcpay
+      - /config/tor-data:/var/lib/tor/
     labels:
       - "coolify.managed=true"
 
 # ============================================================
-# Volumes - Persistent Data Storage
+# Volume Architecture - Bind Mounts
 # ============================================================
-# Volume Architecture:
-#   Config volumes (NVMe RAID 1 - CRITICAL, backed up):
-#     - btcpay_datadir, btcpay_plugins, nbxplorer_datadir
-#     - postgres_datadir, monero_wallet_datadir, tor_keys, tor_data
+# Config (/config -> NVMe RAID 1 - CRITICAL, backed up):
+#   /config/btcpay, /config/btcpay-plugins, /config/nbxplorer
+#   /config/postgres, /config/xmr-wallet, /config/tor-keys, /config/tor-data
 #
-#   Chaindata volumes (HDD - expendable, NOT backed up):
-#     - bitcoin_datadir, bitcoin_wallet_datadir, litecoin_datadir
-#     - mwebd_datadir, monero_datadir, mempool_db_datadir
+# Chaindata (/drive/blockchain -> HDD - expendable, NOT backed up):
+#   /drive/blockchain/btc, /drive/blockchain/btc-wallet
+#   /drive/blockchain/ltc, /drive/blockchain/mwebd
+#   /drive/blockchain/xmr, /drive/blockchain/mempool-db
 # ============================================================
-volumes:
-  # Config volumes (NVMe - CRITICAL, backed up)
-  btcpay_datadir:
-  btcpay_plugins:
-  nbxplorer_datadir:
-  postgres_datadir:
-  monero_wallet_datadir:
-  tor_keys:
-  tor_data:
-  # Chaindata volumes (HDD - expendable, NOT backed up)
-  bitcoin_datadir:
-  bitcoin_wallet_datadir:
-  litecoin_datadir:
-  mwebd_datadir:
-  monero_datadir:
-  mempool_db_datadir:
