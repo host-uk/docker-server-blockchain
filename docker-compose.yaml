@@ -32,8 +32,8 @@ services:
         condition: service_started
       monero-wallet-rpc:
         condition: service_started
-    ports:
-      - "49392:49392"
+    expose:
+      - "49392"
     environment:
       # Required - Critical configuration
       BTCPAY_HOST: ${BTCPAY_HOST:?BTCPay host domain is required}
