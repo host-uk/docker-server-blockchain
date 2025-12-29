@@ -204,6 +204,16 @@ EOF
         log_info "PostgreSQL data directory exists"
     fi
 
+    # Clean up stale PID file if exists (from unclean shutdown)
+    if [ -f "$PGDATA/postmaster.pid" ]; then
+        log_info "Removing stale PostgreSQL PID file..."
+        rm -f "$PGDATA/postmaster.pid"
+    fi
+
+    # Ensure socket directory exists
+    mkdir -p /run/postgresql
+    chown postgres:postgres /run/postgresql
+
     # Start PostgreSQL temporarily to create databases
     gosu postgres pg_ctl -D "$PGDATA" -w start -o "-c listen_addresses=localhost"
 
@@ -248,6 +258,12 @@ init_mariadb() {
     log_section "MariaDB"
 
     export MARIADB_DATADIR="/config/mariadb"
+    export MYSQL_SOCKET="/run/mysqld/mysqld.sock"
+
+    # Ensure socket directory exists with correct permissions
+    mkdir -p /run/mysqld
+    chown mysql:mysql /run/mysqld
+    chmod 755 /run/mysqld
 
     if [ ! -d "$MARIADB_DATADIR/mysql" ]; then
         log_info "Initializing MariaDB data directory..."
@@ -258,20 +274,26 @@ init_mariadb() {
     fi
 
     # Start MariaDB temporarily to create databases
-    mysqld_safe --datadir="$MARIADB_DATADIR" &
+    mysqld_safe --datadir="$MARIADB_DATADIR" --socket="$MYSQL_SOCKET" &
     MYSQL_PID=$!
-    sleep 5
 
-    # Wait for MariaDB to be ready
-    for i in $(seq 1 30); do
-        if mysqladmin ping &>/dev/null; then
+    # Wait for MariaDB socket to be ready
+    log_info "Waiting for MariaDB to be ready..."
+    for i in $(seq 1 60); do
+        if [ -S "$MYSQL_SOCKET" ] && mysqladmin --socket="$MYSQL_SOCKET" ping &>/dev/null; then
+            log_info "MariaDB is ready"
             break
         fi
         sleep 1
     done
 
+    if [ ! -S "$MYSQL_SOCKET" ]; then
+        log_warn "MariaDB socket not found, skipping database setup"
+        return 0
+    fi
+
     # Create mempool database and user
-    mysql -u root <<EOF
+    mysql --socket="$MYSQL_SOCKET" -u root <<EOF
 CREATE DATABASE IF NOT EXISTS mempool;
 CREATE USER IF NOT EXISTS 'mempool'@'localhost' IDENTIFIED BY 'mempool';
 GRANT ALL PRIVILEGES ON mempool.* TO 'mempool'@'localhost';
@@ -279,7 +301,7 @@ FLUSH PRIVILEGES;
 EOF
 
     # Stop MariaDB (supervisor will start it)
-    mysqladmin shutdown
+    mysqladmin --socket="$MYSQL_SOCKET" shutdown
     wait $MYSQL_PID 2>/dev/null || true
 
     log_success "MariaDB initialized"
