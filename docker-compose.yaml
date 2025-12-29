@@ -26,8 +26,7 @@ services:
         reservations:
           memory: 4G
     ports:
-      - "80:80"     # HTTP
-      - "443:443"   # HTTPS
+      - "49392:49392" # BTCPay Server
       - "8333:8333"   # Bitcoin P2P
       - "18080:18080" # Monero P2P
     environment:
