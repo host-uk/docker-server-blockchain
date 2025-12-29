@@ -56,9 +56,9 @@ services:
       MONERO_PRUNE: ${MONERO_PRUNE:-0}
     volumes:
       # Config (NVMe - critical, backed up)
-      - config:/config
+      - /data/btcpay:/config
       # Chaindata (HDD - expendable, NOT backed up)
-      - chaindata:/chaindata
+      - /drive/chain-data:/chaindata
     healthcheck:
       test: ["CMD", "/scripts/health-check.sh"]
       interval: 60s
