@@ -69,8 +69,3 @@ services:
       - "coolify.managed=true"
       - "coolify.port=80"
 
-volumes:
-  config:
-    name: btcpay_config
-  chaindata:
-    name: btcpay_chaindata
