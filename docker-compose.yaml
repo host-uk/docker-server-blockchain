@@ -25,12 +25,11 @@ services:
           memory: 16G
         reservations:
           memory: 4G
-    expose:
-      - "80"
-      - "443"
     ports:
-      - "8333"   # Bitcoin P2P
-      - "18080"  # Monero P2P
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS
+      - "8333:8333"   # Bitcoin P2P
+      - "18080:18080" # Monero P2P
     environment:
       # Domain
       BTCPAY_HOST: ${SERVICE_FQDN_BTCPAY_80:-localhost}
@@ -56,9 +55,9 @@ services:
       MONERO_PRUNE: ${MONERO_PRUNE:-0}
     volumes:
       # Config (NVMe - critical, backed up)
-      - /data/btcpay:/config
+      - ./data/btcpay:/config
       # Chaindata (HDD - expendable, NOT backed up)
-      - /drive/chain-data:/chaindata
+      - ./drive/chain-data:/chaindata
     healthcheck:
       test: ["CMD", "/scripts/health-check.sh"]
       interval: 60s
