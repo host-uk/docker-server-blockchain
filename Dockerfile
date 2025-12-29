@@ -36,6 +36,7 @@
 # Build arguments for version pinning
 ARG ALPINE_VERSION=3.21
 ARG BITCOIN_VERSION=28.1
+ARG LITECOIN_VERSION=0.21.4
 ARG MONERO_VERSION=0.18.4.4
 ARG NBXPLORER_VERSION=2.5.30
 ARG BTCPAY_VERSION=2.3.1
@@ -249,6 +250,38 @@ RUN set -eux; \
     monerod --version
 
 # ============================================================
+# Install Litecoin Core
+# ============================================================
+ARG LITECOIN_VERSION
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH="x86_64-linux-gnu" ;; \
+        arm64) ARCH="aarch64-linux-gnu" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    mkdir -p /tmp/litecoin && cd /tmp/litecoin; \
+    curl -fsSLO "https://download.litecoin.org/litecoin-${LITECOIN_VERSION}/linux/litecoin-${LITECOIN_VERSION}-${ARCH}.tar.gz"; \
+    tar -xzf "litecoin-${LITECOIN_VERSION}-${ARCH}.tar.gz" --strip-components=1; \
+    install -m 0755 bin/litecoind bin/litecoin-cli bin/litecoin-tx /usr/local/bin/; \
+    rm -rf /tmp/litecoin; \
+    litecoind --version
+
+# ============================================================
+# Install mwebd (Litecoin MWEB daemon)
+# ============================================================
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH="amd64" ;; \
+        arm64) ARCH="arm64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    mkdir -p /tmp/mwebd && cd /tmp/mwebd; \
+    curl -fsSL "https://github.com/ltcmweb/mwebd/releases/download/v0.3.0/mwebd-linux-${ARCH}" -o mwebd; \
+    install -m 0755 mwebd /usr/local/bin/; \
+    rm -rf /tmp/mwebd; \
+    mwebd --version || true
+
+# ============================================================
 # Build Mempool Backend (needs to be built in runtime for glibc)
 # ============================================================
 WORKDIR /tmp/mempool
@@ -325,6 +358,8 @@ RUN chmod +x /scripts/*.sh /tests/*.sh 2>/dev/null || true
 EXPOSE 49392
 # Bitcoin P2P
 EXPOSE 8333
+# Litecoin P2P
+EXPOSE 9333
 # Monero P2P
 EXPOSE 18080
 # Nginx (disabled for now)

@@ -28,6 +28,7 @@ services:
     ports:
       - "49392:49392" # BTCPay Server
       - "8333:8333"   # Bitcoin P2P
+      - "9333:9333"   # Litecoin P2P
       - "18080:18080" # Monero P2P
     environment:
       # Domain

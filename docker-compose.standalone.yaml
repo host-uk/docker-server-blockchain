@@ -54,6 +54,9 @@ services:
       BTCPAY_XMR_DAEMON_URI: http://monerod:18089
       BTCPAY_XMR_WALLET_DAEMON_URI: http://monero-wallet-rpc:18083
 
+      # Litecoin MWEB Plugin Configuration
+      BTCPAY_LTC_MWEB_DAEMON_URI: http://mwebd:12345
+
       # Optional - Features
       BTCPAY_SSHKEYFILE: ${BTCPAY_SSHKEYFILE:-}
       BTCPAY_SSHTRUSTEDFINGERPRINTS: ${BTCPAY_SSHTRUSTEDFINGERPRINTS:-}
