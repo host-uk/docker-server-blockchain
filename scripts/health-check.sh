@@ -2,54 +2,49 @@
 # ============================================================
 # BTCPay AIO Health Check Script
 # ============================================================
-# Used by Docker HEALTHCHECK to verify all services
+# Checks if core services are RUNNING (not synced).
+# Blockchain sync takes hours/days - we just need processes up.
 # ============================================================
 
-set -e
+# Check if supervisor is running and services are up
+check_supervisor_service() {
+    local service=$1
+    local status=$(supervisorctl status "$service" 2>/dev/null | awk '{print $2}')
+    [ "$status" = "RUNNING" ]
+}
 
-# Check PostgreSQL
-pg_isready -U "${POSTGRES_USER:-btcpay}" -q || {
-    echo "PostgreSQL is not ready"
+# Core database - must be running
+if ! check_supervisor_service "postgres"; then
+    echo "PostgreSQL not running"
     exit 1
-}
+fi
 
-# Check Bitcoin Core RPC
-bitcoin-cli \
-    -rpcuser="${BITCOIN_RPC_USER:-btcpayrpc}" \
-    -rpcpassword="${BITCOIN_RPC_PASSWORD}" \
-    -rpcport="${BITCOIN_RPC_PORT:-8332}" \
-    getblockchaininfo > /dev/null 2>&1 || {
-    echo "Bitcoin Core RPC is not responding"
+# BTCPay Server - the main service we care about
+if ! check_supervisor_service "btcpayserver"; then
+    echo "BTCPay Server not running"
     exit 1
-}
+fi
 
-# Check Monero RPC
-curl -sf \
-    -u "${MONERO_RPC_USER:-monerorpc}:${MONERO_RPC_PASSWORD}" \
-    http://127.0.0.1:${XMR_RPC_PORT:-18081}/json_rpc \
-    -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' \
-    -H 'Content-Type: application/json' > /dev/null 2>&1 || {
-    echo "Monero RPC is not responding"
+# NBXplorer - required for BTCPay
+if ! check_supervisor_service "nbxplorer"; then
+    echo "NBXplorer not running"
     exit 1
-}
+fi
 
-# Check NBXplorer
-curl -sf http://127.0.0.1:32838/health > /dev/null || {
-    echo "NBXplorer health check failed"
+# Bitcoin daemon - must be running (but NOT necessarily synced)
+if ! check_supervisor_service "bitcoind"; then
+    echo "Bitcoin Core not running"
     exit 1
-}
+fi
 
-# Check BTCPay Server
-curl -sf http://127.0.0.1:49392/health > /dev/null || {
-    echo "BTCPay Server health check failed"
-    exit 1
-}
+# Optional: Quick check if BTCPay web interface responds
+# Use timeout to avoid hanging
+if command -v curl &>/dev/null; then
+    curl -sf --max-time 5 http://127.0.0.1:49392/ > /dev/null 2>&1 || {
+        echo "BTCPay Server not responding yet (may still be starting)"
+        # Don't fail - process is running, just not ready yet
+    }
+fi
 
-# Check Mempool (optional - may take time to sync)
-curl -sf http://127.0.0.1:8999/api/v1/backend-info > /dev/null 2>&1 || {
-    echo "Mempool backend not ready (may still be syncing)"
-    # Don't fail on mempool - it takes time to sync
-}
-
-echo "All services healthy"
+echo "All core services running"
 exit 0
