@@ -74,6 +74,7 @@ export BITCOIN_TXINDEX="${BITCOIN_TXINDEX:-1}"
 
 # Monero settings
 export MONERO_PRUNE="${MONERO_PRUNE:-0}"
+export XMR_WALLET_DIR="${CONFIG_DIR}/xmr-wallets"
 
 # PostgreSQL
 export POSTGRES_USER="${POSTGRES_USER:-btcpay}"
@@ -120,6 +121,13 @@ load_or_generate_password "BITCOIN_RPC_PASSWORD"
 
 export MONERO_RPC_USER="${MONERO_RPC_USER:-monerorpc}"
 load_or_generate_password "MONERO_RPC_PASSWORD"
+
+# Monero Plugin settings (for BTCPay Server) - must be after password loading
+export BTCPAY_XMR_DAEMON_URI="${BTCPAY_XMR_DAEMON_URI:-http://127.0.0.1:18081}"
+export BTCPAY_XMR_DAEMON_USERNAME="${MONERO_RPC_USER}"
+export BTCPAY_XMR_DAEMON_PASSWORD="${MONERO_RPC_PASSWORD}"
+export BTCPAY_XMR_WALLET_DAEMON_URI="${BTCPAY_XMR_WALLET_DAEMON_URI:-http://127.0.0.1:18082}"
+export BTCPAY_XMR_WALLET_DAEMON_WALLETDIR="${XMR_WALLET_DIR}"
 
 # ============================================================
 # Display Configuration
@@ -169,7 +177,7 @@ log_section "Directory Structure"
 
 # Config directories (critical)
 mkdir -p "$PGDATA" "$BTCPAY_DATADIR" "$BTCPAY_PLUGINDIR" "$NBXPLORER_DATADIR"
-mkdir -p "$BTC_CONFDIR" "$XMR_CONFDIR" "$MEMPOOL_CONFDIR"
+mkdir -p "$BTC_CONFDIR" "$XMR_CONFDIR" "$MEMPOOL_CONFDIR" "$XMR_WALLET_DIR"
 mkdir -p /run/postgresql
 
 # Chaindata directories (expendable)
