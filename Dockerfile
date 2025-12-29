@@ -321,13 +321,15 @@ RUN chmod +x /scripts/*.sh /tests/*.sh 2>/dev/null || true
 # ============================================================
 # Expose ports
 # ============================================================
-# Main HTTP/HTTPS (nginx reverse proxy)
-EXPOSE 80
-EXPOSE 443
+# BTCPay Server
+EXPOSE 49392
 # Bitcoin P2P
 EXPOSE 8333
 # Monero P2P
 EXPOSE 18080
+# Nginx (disabled for now)
+# EXPOSE 80
+# EXPOSE 443
 
 # ============================================================
 # Health check

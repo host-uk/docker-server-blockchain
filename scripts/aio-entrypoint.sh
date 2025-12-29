@@ -79,23 +79,47 @@ export MONERO_PRUNE="${MONERO_PRUNE:-0}"
 export POSTGRES_USER="${POSTGRES_USER:-btcpay}"
 export POSTGRES_DB="${POSTGRES_DB:-btcpay}"
 
-# Generate random passwords if not set
-if [ -z "$POSTGRES_PASSWORD" ]; then
-    export POSTGRES_PASSWORD=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    log_warn "Generated random PostgreSQL password"
-fi
+# ============================================================
+# Password Management
+# ============================================================
+# Passwords are stored persistently in /config/.secrets to survive restarts.
+# Priority: ENV variable > stored secret > generate new
+# ============================================================
+
+SECRETS_DIR="${CONFIG_DIR:-.}/.secrets"
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
+
+load_or_generate_password() {
+    local var_name=$1
+    local secret_file="${SECRETS_DIR}/${var_name}"
+    local current_value="${!var_name}"
+
+    if [ -n "$current_value" ]; then
+        # ENV variable is set, use it and save for future
+        echo "$current_value" > "$secret_file"
+        chmod 600 "$secret_file"
+    elif [ -f "$secret_file" ]; then
+        # Load from stored secret
+        export "$var_name"="$(cat "$secret_file")"
+        log_info "Loaded ${var_name} from stored secrets"
+    else
+        # Generate new password and store it
+        local new_pass=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+        export "$var_name"="$new_pass"
+        echo "$new_pass" > "$secret_file"
+        chmod 600 "$secret_file"
+        log_warn "Generated and stored new ${var_name}"
+    fi
+}
+
+load_or_generate_password "POSTGRES_PASSWORD"
 
 export BITCOIN_RPC_USER="${BITCOIN_RPC_USER:-btcpayrpc}"
-if [ -z "$BITCOIN_RPC_PASSWORD" ]; then
-    export BITCOIN_RPC_PASSWORD=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    log_warn "Generated random Bitcoin RPC password"
-fi
+load_or_generate_password "BITCOIN_RPC_PASSWORD"
 
 export MONERO_RPC_USER="${MONERO_RPC_USER:-monerorpc}"
-if [ -z "$MONERO_RPC_PASSWORD" ]; then
-    export MONERO_RPC_PASSWORD=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    log_warn "Generated random Monero RPC password"
-fi
+load_or_generate_password "MONERO_RPC_PASSWORD"
 
 # ============================================================
 # Display Configuration
@@ -217,12 +241,15 @@ EOF
     # Start PostgreSQL temporarily to create databases
     gosu postgres pg_ctl -D "$PGDATA" -w start -o "-c listen_addresses=localhost"
 
-    # Create user and databases
+    # Create user and databases (always update password to ensure consistency)
     gosu postgres psql -v ON_ERROR_STOP=0 <<EOF
 DO \$\$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${POSTGRES_USER}') THEN
         CREATE USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}' CREATEDB;
+    ELSE
+        -- User exists, update password to match current config
+        ALTER USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}';
     END IF;
 END
 \$\$;
