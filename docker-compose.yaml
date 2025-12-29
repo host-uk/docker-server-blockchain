@@ -31,8 +31,8 @@ services:
       - "18080:18080" # Monero P2P
     environment:
       # Domain
-      BTCPAY_HOST: ${SERVICE_FQDN_BTCPAY_80:-localhost}
-      DOMAIN: ${SERVICE_FQDN_BTCPAY_80:-localhost}
+      BTCPAY_HOST: ${SERVICE_FQDN_BTCPAY_49392:-localhost}
+      DOMAIN: ${SERVICE_FQDN_BTCPAY_49392:-localhost}
 
       # Network
       BTCPAY_NETWORK: ${BTCPAY_NETWORK:-mainnet}
