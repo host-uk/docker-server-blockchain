@@ -267,19 +267,17 @@ RUN set -eux; \
     litecoind --version
 
 # ============================================================
-# Install mwebd (Litecoin MWEB daemon)
+# Build mwebd from source (Litecoin MWEB daemon)
 # ============================================================
 RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) ARCH="amd64" ;; \
-        arm64) ARCH="arm64" ;; \
-        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
-    esac; \
+    apt-get update && apt-get install -y --no-install-recommends golang-go && \
     mkdir -p /tmp/mwebd && cd /tmp/mwebd; \
-    curl -fsSL "https://github.com/ltcmweb/mwebd/releases/download/v0.3.0/mwebd-linux-${ARCH}" -o mwebd; \
+    git clone --depth 1 https://github.com/ltcmweb/mwebd.git . ; \
+    go build -o mwebd ./cmd/mwebd; \
     install -m 0755 mwebd /usr/local/bin/; \
-    rm -rf /tmp/mwebd; \
-    mwebd --version || true
+    cd / && rm -rf /tmp/mwebd; \
+    apt-get purge -y golang-go && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
+    mwebd --version || echo "mwebd installed"
 
 # ============================================================
 # Build Mempool Backend (needs to be built in runtime for glibc)
