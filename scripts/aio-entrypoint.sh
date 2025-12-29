@@ -618,11 +618,20 @@ init_nbxplorer() {
 # NBXplorer Configuration
 network=${BTCPAY_NETWORK}
 
+# Chains to index (Bitcoin and Litecoin)
+chains=btc,ltc
+
 # Bitcoin connection
 btcrpcurl=http://127.0.0.1:${BITCOIN_RPC_PORT}/
 btcrpcuser=${BITCOIN_RPC_USER}
 btcrpcpassword=${BITCOIN_RPC_PASSWORD}
 btcnodeendpoint=127.0.0.1:${BITCOIN_PORT:-8333}
+
+# Litecoin connection
+ltcrpcurl=http://127.0.0.1:${LITECOIN_RPC_PORT}/
+ltcrpcuser=${LITECOIN_RPC_USER}
+ltcrpcpassword=${LITECOIN_RPC_PASSWORD}
+ltcnodeendpoint=127.0.0.1:${LITECOIN_P2P_PORT:-9333}
 
 # Database
 postgres=Host=127.0.0.1;Port=5432;Database=nbxplorer;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
