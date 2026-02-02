@@ -44,7 +44,7 @@ jobs:
     if: github.event_name == 'pull_request_target'
     steps:
       - name: Welcome first-time contributor
-        uses: actions/first-interaction@v1
+        uses: actions/first-interaction@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pr-message: |
